@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 import os
+import boto3
 import dotenv
 import requests
 
@@ -41,7 +42,7 @@ def get_response(**kwargs):
     return response.json()
 
 
-def parse_data(data):
+def save_s3(data):
     """
     Parse response.
     :param weather:
@@ -51,7 +52,12 @@ def parse_data(data):
     json_data = data
     pfrase = data['requestPhrase']
     dynamics = data['dynamics']
+    # minioClient = Minio('minio:9000',
+    #                     access_key='weak_access_key',
+    #                     secret_key='weak_secret_key',
+    #                     secure=False)
+    # minioClient.list_buckets()
 
 
 if __name__ == '__main__':
-    parse_data(get_response())
+    save_s3(get_response())
