@@ -1,4 +1,3 @@
 # SEO pipline
 ## Проект предназначен для получения данных с API для определения частоты слов в пользовательских запросах в Яндекс-поиске.
-
-![Иллюстрация к проекту](https://github.com/taren4ik/wordstat/image/miro.jpg)
+![alt text](images/miro.jpg)
