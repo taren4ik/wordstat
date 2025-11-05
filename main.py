@@ -1,19 +1,30 @@
 from datetime import datetime
 import os
+import time
 import json
 import boto3
 import dotenv
-
+import logging
 import requests
 from botocore.exceptions import NoCredentialsError, ClientError
 
+logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.INFO,
+    filename='wordstat.log',
+    format='%(asctime)s,'
+           ' %(levelname)s,'
+           ' %(funcName)s,'
+           '%(lineno)s,'
+           '%(message)s, '
+           '%(name)s'
+)
 dotenv.load_dotenv()
 access_token = os.getenv("ACCESS_TOKEN")
 access_key_id = os.getenv("KEY_ID")
 secret_access_key = os.getenv("ACCESS_KEY")
 
 url = "https://api.wordstat.yandex.net/v1/dynamics"
-
 
 headers = {
     "Content-Type": "application/json;charset=utf-8",
@@ -30,21 +41,40 @@ data = {
 }
 
 
-def get_response(**kwargs):
+def get_response(retries=3, **kwargs):
     """
-    Get and check response.
-    :return:
+    A POST request is made with response checking and retries.
+    :param retries: Number of retries
+    :param kwargs: Additional arguments for requests.post()
+    :return: Response data in JSON format, or None on error.
     """
-    response = requests.post(
-        url,
-        headers=headers,
-        json=data
-    )
-    if response.status_code == 200:
-        print(f'Данные получены, {response.status_code}')
-    else:
-        print(f'Ошибка: {response.status_code}')
-    return response.json()
+    FIXED_DELAY = 10
+
+    for attempt in range(retries + 1):
+        try:
+            response = requests.post(**kwargs)
+            if response.status_code == 200:
+                logging.info(f'Данные получены, код {response.status_code}')
+                return response.json()
+            else:
+                logging.warning(
+                    f'Ошибка {response.status_code} ('
+                    f'попытка {attempt + 1}/{retries + 1})')
+
+        except requests.exceptions.RequestException as e:
+            logging.error(
+                f'Сетевая ошибка: {e} (попытка {attempt + 1}/{retries + 1})')
+
+        # Если остались повторные попытки - ждем 10 секунд перед следующей
+        if attempt < retries:
+            logging.info(
+                f'Ожидание {FIXED_DELAY} секунд перед повторной попыткой...')
+            time.sleep(FIXED_DELAY)
+        else:
+            logging.error(
+                f'Все попытки исчерпаны. Последний статус:'
+                f' {response.status_code}')
+            return None
 
 
 def upload_s3(data):
@@ -63,18 +93,18 @@ def upload_s3(data):
         )
         buffer = json.dumps(data, ensure_ascii=False).encode("utf-8")
         s3.put_object(
-            Body = buffer,
-            Bucket = "wordstat",
-            Key = f"mos_ru_{date_now}.json",
+            Body=buffer,
+            Bucket="wordstat",
+            Key=f"mos_ru_{date_now}.json",
         )
-        print("✅ Upload successful")
+        logging.info("✅ Upload successful")
 
     except FileNotFoundError:
-        print("❌ File not found")
+        logging.error("❌ File not found")
     except NoCredentialsError:
-        print("❌ Invalid credentials")
+        logging.error("❌ Invalid credentials")
     except ClientError as e:
-        print(f"❌ AWS error: {e}")
+        logging.error(f"❌ AWS error: {e}")
 
     # json_data = data
     # pfrase = data['requestPhrase']
@@ -82,4 +112,4 @@ def upload_s3(data):
 
 
 if __name__ == '__main__':
-    upload_s3(get_response())
+    upload_s3(get_response(url=url, headers=headers, json=data))
