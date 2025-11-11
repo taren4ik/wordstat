@@ -24,7 +24,9 @@ access_token = os.getenv("ACCESS_TOKEN")
 access_key_id = os.getenv("KEY_ID")
 secret_access_key = os.getenv("ACCESS_KEY")
 
-url = "https://api.wordstat.yandex.net/v1/dynamics"
+url = "https://api.wordstat.yandex.net/v1/"
+
+endpoints = ["dynamics", "getRegionsTree"]
 
 headers = {
     "Content-Type": "application/json;charset=utf-8",
@@ -65,7 +67,6 @@ def get_response(retries=3, **kwargs):
             logging.error(
                 f'Сетевая ошибка: {e} (попытка {attempt + 1}/{retries + 1})')
 
-        # Если остались повторные попытки - ждем 10 секунд перед следующей
         if attempt < retries:
             logging.info(
                 f'Ожидание {FIXED_DELAY} секунд перед повторной попыткой...')
@@ -74,10 +75,9 @@ def get_response(retries=3, **kwargs):
             logging.error(
                 f'Все попытки исчерпаны. Последний статус:'
                 f' {response.status_code}')
-            return None
 
 
-def upload_s3(data):
+def upload_s3(data, endpoint):
     """
     Upload to s3 file.
     :param data:
@@ -95,9 +95,9 @@ def upload_s3(data):
         s3.put_object(
             Body=buffer,
             Bucket="wordstat",
-            Key=f"mos_ru_{date_now}.json",
+            Key=f"mos_ru_{endpoint}_{date_now}.json",
         )
-        logging.info("✅ Upload successful")
+        logging.info("✅ Upload successful from endpoint")
 
     except FileNotFoundError:
         logging.error("❌ File not found")
@@ -112,4 +112,9 @@ def upload_s3(data):
 
 
 if __name__ == '__main__':
-    upload_s3(get_response(url=url, headers=headers, json=data))
+    for endpoint in endpoints:
+        upload_s3(get_response(
+            url=(url + endpoint),
+            headers=headers,
+            json=data), endpoint
+        )
