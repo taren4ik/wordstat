@@ -1,6 +1,6 @@
 from datetime import datetime
 from airflow import DAG
-from airflow.operators.empty import EmptyOperator
+from airflow.operators.empty import EmptyOperator, PythonOperator
 import os
 import time
 import json
@@ -111,6 +111,12 @@ def upload_s3(data, endpoint):
         logging.error(f"❌ AWS error: {e}")
 
 
+def start_upload():
+    upload_s3(get_response(
+                url=(url + endpoint),
+                headers=headers,
+                json=data), endpoint
+            )
 
 with DAG('wordstat_extract',
          description='select and transform data',
@@ -119,22 +125,12 @@ with DAG('wordstat_extract',
          start_date=datetime.datetime(2025, 11, 14),
          tags=['wordstat', 'etl']
          ) as dag:
+    upload = PythonOperator(task_id='start_upload',
+                                  python_callable=start_upload)
 
+    start = EmptyOperator(task_id='start_workflow')
 
-
-
-def upload():
-    upload_s3(get_response(
-                url=(url + endpoint),
-                headers=headers,
-                json=data), endpoint
-            )
-
-
-start = EmptyOperator(task_id='start_workflow')
-
-
-start >>
+start >> upload
 
 if __name__ == "__main__":
     dag.test()

@@ -26,7 +26,7 @@ secret_access_key = os.getenv("ACCESS_KEY")
 
 url = "https://api.wordstat.yandex.net/v1/"
 
-endpoints = ["dynamics", "getRegionsTree"]
+endpoints = ["dynamics", "topRequests"]
 
 headers = {
     "Content-Type": "application/json;charset=utf-8",
@@ -35,13 +35,17 @@ headers = {
 year = datetime.now().year
 date_now = datetime.now().date().strftime("_%Y_%m_%d")
 
-data = {
+data_dynamics = {
     "phrase": "мос ру",
     "devices": ["all"],
     "period": "monthly",
     "fromDate": f"{year}-01-01",
 }
 
+data_top = {
+    "phrase": "мос ру",
+    "devices": ["all"]
+}
 
 def get_response(retries=3, **kwargs):
     """
@@ -113,8 +117,15 @@ def upload_s3(data, endpoint):
 
 if __name__ == '__main__':
     for endpoint in endpoints:
-        upload_s3(get_response(
-            url=(url + endpoint),
-            headers=headers,
-            json=data), endpoint
-        )
+        if endpoint == "dynamics":
+            upload_s3(get_response(
+                url=(url + endpoint),
+                headers=headers,
+                json=data_dynamics), endpoint
+            )
+        else:
+            upload_s3(get_response(
+                url=(url + endpoint),
+                headers=headers,
+                json=data_top), endpoint
+            )
