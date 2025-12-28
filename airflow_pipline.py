@@ -1,14 +1,14 @@
-from datetime import datetime
 from airflow import DAG
-from airflow.operators.empty import EmptyOperator, PythonOperator
+from airflow.models import Variable
+from airflow.operators.empty import EmptyOperator
+from airflow.operators.python import PythonOperator
 import os
 import time
 import json
-import boto3
 import dotenv
 import logging
 import requests
-from botocore.exceptions import NoCredentialsError, ClientError
+from datetime import datetime
 
 logging.basicConfig(level=logging.INFO)
 logging.basicConfig(
@@ -21,116 +21,117 @@ logging.basicConfig(
            '%(message)s, '
            '%(name)s'
 )
-dotenv.load_dotenv()
-access_token = os.getenv("ACCESS_TOKEN")
-access_key_id = os.getenv("KEY_ID")
-secret_access_key = os.getenv("ACCESS_KEY")
 
-url = "https://api.wordstat.yandex.net/v1/"
 
-endpoint = "dynamics"
-
-headers = {
-    "Content-Type": "application/json;charset=utf-8",
-    "Authorization": f"Bearer {access_token}"
-}
-year = datetime.now().year
-date_now = datetime.now().date().strftime("_%Y_%m_%d")
-
-data = {
-    "phrase": "мос ру",
-    "devices": ["all"],
-    "period": "monthly",
-    "fromDate": f"{year}-01-01",
-}
+# access_key_id = os.getenv("KEY_ID")
+# secret_access_key = os.getenv("ACCESS_KEY")
 
 
 
+WORDSTAT_URL = "https://api.wordstat.yandex.net/v1/dynamics"
+FIXED_DELAY = 10
+RETRIES = 3
 
-def get_response(retries=3, **kwargs):
+
+def get_response():
     """
     A POST request is made with response checking and retries.
     :param retries: Number of retries
     :param kwargs: Additional arguments for requests.post()
     :return: Response data in JSON format, or None on error.
     """
-    FIXED_DELAY = 10
+    api_token = Variable.get('TOKEN_WORDSTAT')
+    headers = {
+        "Content-Type": "application/json;charset=utf-8",
+        "Authorization": f"Bearer {api_token}"
+    }
+    year = datetime.now().year
 
-    for attempt in range(retries + 1):
+    data = {
+        "phrase": "мос ру",
+        "devices": ["all"],
+        "period": "monthly",
+        "fromDate": f"{year}-01-01",
+    }
+
+    for attempt in range(RETRIES + 1):
         try:
-            response = requests.post(**kwargs)
+            response = requests.post(
+                url=WORDSTAT_URL,
+                headers=headers,
+                json=data,
+                timeout=30,
+            )
+            print(response)
             if response.status_code == 200:
-                logging.info(f'Данные получены, код {response.status_code}')
-                return response.json()
-            else:
-                logging.warning(
-                    f'Ошибка {response.status_code} ('
-                    f'попытка {attempt + 1}/{retries + 1})')
+                logging.info("✅ Данные Wordstat успешно получены")
+                logging.info(response.json())
+                return
+
+            logging.warning(
+                f"HTTP {response.status_code} "
+                f"(attempt {attempt + 1}/{RETRIES + 1})"
+            )
 
         except requests.exceptions.RequestException as e:
-            logging.error(
-                f'Сетевая ошибка: {e} (попытка {attempt + 1}/{retries + 1})')
+            logging.error(f"Network error: {e}")
 
-        if attempt < retries:
-            logging.info(
-                f'Ожидание {FIXED_DELAY} секунд перед повторной попыткой...')
-            time.sleep(FIXED_DELAY)
-        else:
-            logging.error(
-                f'Все попытки исчерпаны. Последний статус:'
-                f' {response.status_code}')
+        time.sleep(FIXED_DELAY)
+
+    raise RuntimeError("❌ Wordstat request failed after retries")
 
 
-def upload_s3(data, endpoint):
-    """
-    Upload to s3 file.
-    :param data:
-    :return:
-    """
-    try:
-        s3 = boto3.client(
-            's3',
-            endpoint_url='http://127.0.0.1:9100',
-            aws_access_key_id=access_key_id,
-            aws_secret_access_key=secret_access_key,
-            region_name='us-east-1'
-        )
-        buffer = json.dumps(data, ensure_ascii=False).encode("utf-8")
-        s3.put_object(
-            Body=buffer,
-            Bucket="wordstat",
-            Key=f"mos_ru_{endpoint}_{date_now}.json",
-        )
-        logging.info("✅ Upload successful from endpoint")
+# def upload_s3(data, endpoint):
+#     """
+#     Upload to s3 file.
+#     :param data:
+#     :return:
+#     """
+#     try:
+#         s3 = boto3.client(
+#             's3',
+#             endpoint_url='http://127.0.0.1:9100',
+#             aws_access_key_id=access_key_id,
+#             aws_secret_access_key=secret_access_key,
+#             region_name='us-east-1'
+#         )
+#         buffer = json.dumps(data, ensure_ascii=False).encode("utf-8")
+#         s3.put_object(
+#             Body=buffer,
+#             Bucket="wordstat",
+#             Key=f"mos_ru_{endpoint}_{date_now}.json",
+#         )
+#         logging.info("✅ Upload successful from endpoint")
+#
+#     except FileNotFoundError:
+#         logging.error("❌ File not found")
+#     except NoCredentialsError:
+#         logging.error("❌ Invalid credentials")
+#     except ClientError as e:
+#         logging.error(f"❌ AWS error: {e}")
 
-    except FileNotFoundError:
-        logging.error("❌ File not found")
-    except NoCredentialsError:
-        logging.error("❌ Invalid credentials")
-    except ClientError as e:
-        logging.error(f"❌ AWS error: {e}")
-
-
-def start_upload():
-    upload_s3(get_response(
-                url=(url + endpoint),
-                headers=headers,
-                json=data), endpoint
-            )
+#
+# def start_upload():
+#     upload_s3(get_response(
+#                 url=(url + endpoint),
+#                 headers=headers,
+#                 json=data), endpoint
+#             )
 
 with DAG('wordstat_extract',
          description='select and transform data',
          schedule_interval='0 */24 * * *',
          catchup=False,
-         start_date=datetime.datetime(2025, 11, 14),
+         start_date=datetime(2025, 11, 14),
          tags=['wordstat', 'etl']
          ) as dag:
-    upload = PythonOperator(task_id='start_upload',
-                                  python_callable=start_upload)
+    get_data = PythonOperator(task_id='start_upload',
+                              python_callable=get_response,
+                              )
 
     start = EmptyOperator(task_id='start_workflow')
 
-start >> upload
+    start >> get_data
 
 if __name__ == "__main__":
     dag.test()
