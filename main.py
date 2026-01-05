@@ -32,7 +32,7 @@ headers = {
     "Content-Type": "application/json;charset=utf-8",
     "Authorization": f"Bearer {access_token}"
 }
-year = datetime.now().year
+year = datetime.now().year -1
 date_now = datetime.now().date().strftime("_%Y_%m_%d")
 
 data_dynamics = {

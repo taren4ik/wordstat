@@ -2,6 +2,7 @@ from airflow import DAG
 from airflow.models import Variable
 from airflow.operators.empty import EmptyOperator
 from airflow.operators.python import PythonOperator
+from airflow.providers.amazon.aws.hooks.s3 import S3Hook
 import os
 import time
 import json
@@ -23,11 +24,6 @@ logging.basicConfig(
 )
 
 
-# access_key_id = os.getenv("KEY_ID")
-# secret_access_key = os.getenv("ACCESS_KEY")
-
-
-
 WORDSTAT_URL = "https://api.wordstat.yandex.net/v1/dynamics"
 FIXED_DELAY = 10
 RETRIES = 3
@@ -45,7 +41,7 @@ def get_response():
         "Content-Type": "application/json;charset=utf-8",
         "Authorization": f"Bearer {api_token}"
     }
-    year = datetime.now().year
+    year = datetime.now().year - 1
 
     data = {
         "phrase": "мос ру",
@@ -66,7 +62,8 @@ def get_response():
             if response.status_code == 200:
                 logging.info("✅ Данные Wordstat успешно получены")
                 logging.info(response.json())
-                return
+                print (response)
+                return response.json()
 
             logging.warning(
                 f"HTTP {response.status_code} "
@@ -81,42 +78,21 @@ def get_response():
     raise RuntimeError("❌ Wordstat request failed after retries")
 
 
-# def upload_s3(data, endpoint):
-#     """
-#     Upload to s3 file.
-#     :param data:
-#     :return:
-#     """
-#     try:
-#         s3 = boto3.client(
-#             's3',
-#             endpoint_url='http://127.0.0.1:9100',
-#             aws_access_key_id=access_key_id,
-#             aws_secret_access_key=secret_access_key,
-#             region_name='us-east-1'
-#         )
-#         buffer = json.dumps(data, ensure_ascii=False).encode("utf-8")
-#         s3.put_object(
-#             Body=buffer,
-#             Bucket="wordstat",
-#             Key=f"mos_ru_{endpoint}_{date_now}.json",
-#         )
-#         logging.info("✅ Upload successful from endpoint")
-#
-#     except FileNotFoundError:
-#         logging.error("❌ File not found")
-#     except NoCredentialsError:
-#         logging.error("❌ Invalid credentials")
-#     except ClientError as e:
-#         logging.error(f"❌ AWS error: {e}")
+def upload_to_s3(data):
+    date_now = datetime.now().date().strftime("_%Y_%m_%d")
+    hook = S3Hook(aws_conn_id="s3_connect")
+    hook.load_string(
+        string_data=json.dumps(data, ensure_ascii=False),
+        key=f"mos_ru_dynamics_{date_now}.json",
+        bucket_name="wordstat",
+        replace=True,
+    )
 
-#
-# def start_upload():
-#     upload_s3(get_response(
-#                 url=(url + endpoint),
-#                 headers=headers,
-#                 json=data), endpoint
-#             )
+
+def get_and_upload():
+    data = get_response()
+    upload_to_s3(data)
+
 
 with DAG('wordstat_extract',
          description='select and transform data',
@@ -126,7 +102,7 @@ with DAG('wordstat_extract',
          tags=['wordstat', 'etl']
          ) as dag:
     get_data = PythonOperator(task_id='start_upload',
-                              python_callable=get_response,
+                              python_callable=get_and_upload,
                               )
 
     start = EmptyOperator(task_id='start_workflow')
