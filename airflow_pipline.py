@@ -3,10 +3,8 @@ from airflow.models import Variable
 from airflow.operators.empty import EmptyOperator
 from airflow.operators.python import PythonOperator
 from airflow.providers.amazon.aws.hooks.s3 import S3Hook
-import os
 import time
 import json
-import dotenv
 import logging
 import requests
 from datetime import datetime
@@ -94,6 +92,20 @@ def upload_to_s3(data):
     )
 
 
+def load_from_s3():
+    """Load data from s3."""
+    date_now = datetime.now().date().strftime("_%Y_%m_%d")
+    hook = S3Hook(aws_conn_id="s3_connect")
+    content = hook.read_key(
+        key=f"mos_ru_dynamics_{date_now}.json",
+        bucket_name="wordstat"
+    )
+    rows = [json.loads(line) for line in content.splitlines()]
+    print (rows)
+    return rows
+
+
+
 def get_and_upload():
     """
     Get data and insert to Clickhouse.
@@ -113,10 +125,13 @@ with DAG('wordstat_extract',
     get_data = PythonOperator(task_id='start_upload',
                               python_callable=get_and_upload,
                               )
-
+    read_s3_task = PythonOperator(
+        task_id="load_from_s3",
+        python_callable=load_from_s3,
+    )
     start = EmptyOperator(task_id='start_workflow')
 
-    start >> get_data
+    start >> get_data >> read_s3_task
 
 if __name__ == "__main__":
     dag.test()
