@@ -79,6 +79,11 @@ def get_response():
 
 
 def upload_to_s3(data):
+    """
+    Insert into s3.
+    :param data:
+    :return:
+    """
     date_now = datetime.now().date().strftime("_%Y_%m_%d")
     hook = S3Hook(aws_conn_id="s3_connect")
     hook.load_string(
@@ -90,6 +95,10 @@ def upload_to_s3(data):
 
 
 def get_and_upload():
+    """
+    Get data and insert to Clickhouse.
+    :return:
+    """
     data = get_response()
     upload_to_s3(data)
 
