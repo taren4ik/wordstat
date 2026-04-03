@@ -1,8 +1,9 @@
-from datetime import datetime
+import datetime
 import os
 import time
 import dotenv
 import logging
+import pandas as pd
 import requests
 
 # load_dotenv()
@@ -39,14 +40,14 @@ headers = {
     "Content-Type": "application/json;charset=utf-8",
     "Authorization": f"Bearer {access_token}"
 }
-year = datetime.now().year - 1
-date_now = datetime.now().date().strftime("_%Y_%m_%d")
+year = datetime.datetime.now().year - 1
+date_now = datetime.datetime.now().date().strftime("_%Y_%m_%d")
 
 data_dynamics = {
     "phrase": "",
     "devices": ["all"],
     "period": "monthly",
-    "fromDate": f"{year}-01-01",
+    "fromDate": f"{year}-01-01"
 }
 
 companies = ['Альфа-Лизинг',
@@ -200,14 +201,34 @@ def get_response(retries=3, **kwargs):
                 f'Все попытки исчерпаны. Последний статус:'
                 f' {response.status_code}')
 
+
+def get_companies_df():
+    all_df = []
+    for company in companies:
+        data_dynamics['phrase'] = company
+        response = get_response(
+            url=(url + endpoints[0]),
+            headers=headers,
+            json=data_dynamics
+        )
+        if isinstance(response, dict):
+            data = response
+
+        df = pd.DataFrame(data['dynamics'])
+        df['requestPhrase'] = data['requestPhrase']
+        all_df.append(df)
+    result = pd.concat(all_df, ignore_index=True)
+    return result
+
+
 def write_profiles_to_csv(df, flag=False):
     """
     Запись информации в файл из DataFrame.
     :param df, flag:
     :return:
     """
-    path = datetime.date.today().__str__().replace("-", "_")
-    filename = f"profiles_farpost_{path}.csv"
+    path = datetime.date.today.__str__().replace("-", "_")
+    filename = f"leasing_{date_now}.csv"
     df.to_csv(
         f"{filename}", mode="a", sep=";", header=flag, index=False,
         encoding="utf-16"
@@ -253,10 +274,4 @@ def write_profiles_to_csv(df, flag=False):
 
 
 if __name__ == '__main__':
-    for company in companies:
-        data_dynamics['phrase'] = company
-        print(get_response(url=(url + endpoints[0]),
-                     headers=headers,
-                     json=data_dynamics
-                     ))
-
+    write_profiles_to_csv(get_companies_df())
