@@ -34,7 +34,7 @@ secret_access_key = os.getenv("ACCESS_KEY")
 
 url = "https://api.wordstat.yandex.net/v1/"
 
-endpoints = ["dynamics", "topRequests"]
+endpoints = ["dynamics", "regions", "topRequests", "getRegionsTree"]
 
 headers = {
     "Content-Type": "application/json;charset=utf-8",
@@ -48,6 +48,12 @@ data_dynamics = {
     "devices": ["all"],
     "period": "monthly",
     "fromDate": f"{year}-01-01"
+}
+
+data_regions = {
+    "phrase": "",
+    "devices": ["all"],
+    "regionType": "regions"
 }
 
 companies = ['Альфа-Лизинг',
@@ -202,19 +208,34 @@ def get_response(retries=3, **kwargs):
                 f' {response.status_code}')
 
 
-def get_companies_df():
+def get_companies_df(endpoint):
+    """
+    Create DataFrame.
+    :param endpoint:
+    :return:
+    """
     all_df = []
     for company in companies:
-        data_dynamics['phrase'] = company
+        if endpoint == "dynamics":
+            data_dynamics['phrase'] = company
+            json = data_dynamics
+        elif endpoint == "regions":
+            data_regions['phrase'] = company
+            json = data_regions
+
         response = get_response(
-            url=(url + endpoints[0]),
+            url=(url + endpoint),
             headers=headers,
-            json=data_dynamics
+            json=json
         )
+        # response2 = get_response(
+        #     url=(url + endpoints[3]),
+        #     headers=headers,
+        # )
         if isinstance(response, dict):
             data = response
 
-        df = pd.DataFrame(data['dynamics'])
+        df = pd.DataFrame(data[endpoint])
         df['requestPhrase'] = data['requestPhrase']
         all_df.append(df)
     result = pd.concat(all_df, ignore_index=True)
@@ -234,6 +255,7 @@ def write_profiles_to_csv(df, flag=False):
         encoding="utf-16"
     )
     return filename
+
 
 # def load_db(filename):
 #     """
@@ -274,4 +296,4 @@ def write_profiles_to_csv(df, flag=False):
 
 
 if __name__ == '__main__':
-    write_profiles_to_csv(get_companies_df())
+    write_profiles_to_csv(get_companies_df(endpoints[0]))
