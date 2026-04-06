@@ -5,15 +5,17 @@ import dotenv
 import logging
 import pandas as pd
 import requests
+from dotenv import load_dotenv
+from sqlalchemy import create_engine
 
-# load_dotenv()
-#
-# host = os.getenv("DB_HOST")
-# database = os.getenv("DB_NAME")
-# schema_name = os.getenv("DB_SCHEMA")
-# table_name = os.getenv("DB_TABLE_NAME")
-# user = os.getenv("DB_USER")
-# password = os.getenv("DB_PASS")
+load_dotenv()
+
+host = os.getenv("DB_HOST")
+database = os.getenv("DB_NAME")
+schema_name = os.getenv("DB_SCHEMA")
+table_name = os.getenv("DB_TABLE_NAME")
+user = os.getenv("DB_USER")
+password = os.getenv("DB_PASS")
 
 logging.basicConfig(level=logging.INFO)
 logging.basicConfig(
@@ -29,8 +31,8 @@ logging.basicConfig(
 
 dotenv.load_dotenv()
 access_token = os.getenv("ACCESS_TOKEN")
-access_key_id = os.getenv("KEY_ID")
-secret_access_key = os.getenv("ACCESS_KEY")
+# access_key_id = os.getenv("KEY_ID")
+# secret_access_key = os.getenv("ACCESS_KEY")
 
 url = "https://api.wordstat.yandex.net/v1/"
 
@@ -242,7 +244,7 @@ def get_companies_df(endpoint):
     return result
 
 
-def write_profiles_to_csv(df, flag=False):
+def write_profiles_to_csv(df, flag=True):
     """
     Запись информации в файл из DataFrame.
     :param df, flag:
@@ -257,43 +259,47 @@ def write_profiles_to_csv(df, flag=False):
     return filename
 
 
-# def load_db(filename):
-#     """
-#     Загрузка в stage слой.
-#     :param path:
-#     :return:
-#     """
-#
-#     database_uri = (
-#         f"postgresql://{user}:{password}@{host}/{database}")
-#
-#     engine = create_engine(database_uri)
-#
-#     try:
-#         df = pd.read_csv(
-#             filename,
-#             encoding='utf-16',
-#             delimiter=';',
-#             header=0,
-#             engine='python',
-#
-#         )
-#     except Exception as e:
-#         print(f"Ошибка при загрузке CSV: {e}")
-#
-#     df.drop_duplicates(subset=['id'], keep='first', inplace=True)
-#     if 'is_check' in df.columns:
-#         df['is_check'] = df['is_check'].astype(bool)
-#
-#     with engine.begin() as connection:
-#         df.to_sql(
-#             table_name,
-#             connection,
-#             schema=schema_name,
-#             if_exists='append',
-#             index=False
-#         )
+def load_db(filename):
+    """
+    Загрузка в stage слой.
+    :param path:
+    :return:
+    """
+
+    database_uri = (
+        f"postgresql://{user}:{password}@{host}/{database}")
+
+    engine = create_engine(database_uri)
+
+    try:
+        df = pd.read_csv(
+            filename,
+            encoding='utf-16',
+            delimiter=';',
+            header=0,
+            engine='python',
+
+        )
+    except Exception as e:
+        print(f"Ошибка при загрузке CSV: {e}")
+
+    # df.drop_duplicates(subset=['id'], keep='first', inplace=True)
+    # if 'is_check' in df.columns:
+    #     df['is_check'] = df['is_check'].astype(bool)
+    df.insert(0, 'date_load', datetime.datetime.now().date().strftime(
+        "%Y-%m-%d"))
+
+    with engine.begin() as connection:
+        df.to_sql(
+            table_name,
+            connection,
+            schema=schema_name,
+            if_exists='append',
+            index=False
+        )
 
 
 if __name__ == '__main__':
-    write_profiles_to_csv(get_companies_df(endpoints[0]))
+    #load_db(write_profiles_to_csv(get_companies_df(endpoints[0])))
+    load_db("leasing__2026_04_04.csv")
+
