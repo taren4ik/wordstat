@@ -36,7 +36,11 @@ access_token = os.getenv("ACCESS_TOKEN")
 
 url = "https://api.wordstat.yandex.net/v1/"
 
-endpoints = ["dynamics", "regions", "topRequests", "getRegionsTree"]
+endpoints = ("dynamics",
+             "regions",
+             "topRequests",
+             "getRegionsTree"
+             )
 
 headers = {
     "Content-Type": "application/json;charset=utf-8",
@@ -250,7 +254,7 @@ def write_profiles_to_csv(df, flag=True):
     :param df, flag:
     :return:
     """
-    path = datetime.date.today.__str__().replace("-", "_")
+    #path = datetime.date.today.__str__().replace("-", "_")
     filename = f"leasing_{date_now}.csv"
     df.to_csv(
         f"{filename}", mode="a", sep=";", header=flag, index=False,
@@ -300,6 +304,5 @@ def load_db(filename):
 
 
 if __name__ == '__main__':
-    #load_db(write_profiles_to_csv(get_companies_df(endpoints[0])))
+    # load_db(write_profiles_to_csv(get_companies_df(endpoints[0])))
     load_db("leasing__2026_04_04.csv")
-
