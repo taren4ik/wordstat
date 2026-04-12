@@ -177,7 +177,8 @@ companies = ['Альфа-Лизинг',
              'БЭЛТИ-ГРАНД',
              'Межрегиональная лизинговая компания',
              'Русавтолизинг',
-             'Пионер-Лизинг']
+             'Пионер-Лизинг'
+             ]
 
 
 def get_response(retries=3, **kwargs):
@@ -229,15 +230,17 @@ def get_companies_df(endpoint):
             data_regions['phrase'] = company
             json = data_regions
 
+            # response2 = get_response(
+            #     url=(url + endpoints[3]),
+            #     headers=headers,
+            # )
+
         response = get_response(
             url=(url + endpoint),
             headers=headers,
             json=json
         )
-        # response2 = get_response(
-        #     url=(url + endpoints[3]),
-        #     headers=headers,
-        # )
+
         if isinstance(response, dict):
             data = response
 
@@ -254,7 +257,7 @@ def write_profiles_to_csv(df, flag=True):
     :param df, flag:
     :return:
     """
-    #path = datetime.date.today.__str__().replace("-", "_")
+    # path = datetime.date.today.__str__().replace("-", "_")
     filename = f"leasing_{date_now}.csv"
     df.to_csv(
         f"{filename}", mode="a", sep=";", header=flag, index=False,
