@@ -47,6 +47,7 @@ data_top = {
     "devices": ["all"]
 }
 
+
 def get_response(retries=3, **kwargs):
     """
     A POST request is made with response checking and retries.
