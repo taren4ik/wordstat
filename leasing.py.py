@@ -64,6 +64,7 @@ data_regions = {
 
 data_top_requests = {
     "phrase": "",
+     "numPhrases": 2000,
     "devices": ["all"]
 }
 
@@ -238,7 +239,8 @@ def get_companies_df(endpoint):
             json = data_regions
 
         elif endpoint == "topRequests":
-            data_top_requests['phrase'] = 'лизинг'
+            data_top_requests['phrase'] = 'лизинг купить'
+            #data_top_requests['phrase'] = company + ' купить'
             json = data_top_requests
 
             # response2 = get_response(
@@ -257,8 +259,16 @@ def get_companies_df(endpoint):
 
         df = pd.DataFrame(data[endpoint])
         df['requestPhrase'] = data['requestPhrase']
+        df['type'] = 'relevant'
+        df['endpoint'] = endpoint
         all_df.append(df)
-        if endpoint == "topRequests":
+
+        if endpoint == "topRequests":   #когда запросы не массовые
+            assoc_df = pd.DataFrame(data['associations'])
+            assoc_df['requestPhrase'] = data['requestPhrase']
+            assoc_df['type'] = 'association'
+            df['endpoint'] = endpoint
+            all_df.append(assoc_df)
             return pd.concat(all_df, ignore_index=True)
     result = pd.concat(all_df, ignore_index=True)
     return result
