@@ -267,7 +267,7 @@ def get_companies_df(endpoint):
             assoc_df = pd.DataFrame(data['associations'])
             assoc_df['requestPhrase'] = data['requestPhrase']
             assoc_df['type'] = 'association'
-            df['endpoint'] = endpoint
+            assoc_df['endpoint'] = endpoint
             all_df.append(assoc_df)
             return pd.concat(all_df, ignore_index=True)
     result = pd.concat(all_df, ignore_index=True)
